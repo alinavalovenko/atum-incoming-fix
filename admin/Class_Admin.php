@@ -20,7 +20,6 @@ class Class_Admin {
 
 	private function define_hooks() {
 		add_action( 'save_post_atum_purchase_order', array( $this, 'update_ca_incoming' ), PHP_INT_MAX );
-
 		add_action( 'acp/editing/saved', array( $this, 'on_incoming_save' ), 10, 3 );
 		add_action( 'atum/orders/after_delete_item', array( $this, 'on_purchase_order_item_delete' ) );
 		add_action( 'wp_trash_post', array( $this, 'on_purchase_move_to_trash' ) );
@@ -33,26 +32,49 @@ class Class_Admin {
 		$atum_order_status = $atum_order->get_status();
 		$line_items        = $atum_order->get_items( 'line_item' );
 		$meta_key          = "_w8_atum_purchase_order_{$post_ID}";
+		$po_meta_key       = '_av_new_atum_purchase_order_' . $post_ID;
+		if ( $line_items ) {
+			foreach ( $line_items as $item_id => $item ) {
+				$product = $item->get_product();
+				/** @var \WC_Product $product */
+				if ( empty( $product ) ) {
+					continue;
+				};
 
-		foreach ( $line_items as $item_id => $item ) {
-			$product = $item->get_product();
-			/** @var \WC_Product $product */
-			if ( empty( $product ) ) {
-				continue;
+				$product_id             = ( $product->get_type() == 'variation' ) ? $product->get_parent_id() : $product->get_id();
+				$product_incoming_value = get_post_meta( $product_id, 'ca_incoming', true );
+				$order_qty              = $item->get_quantity();
+				if ( 'completed' == $atum_order_status || 'received' == $atum_order_status ) {
+					//decrease incoming value
+					update_post_meta( $product_id, 'ca_incoming', $product_incoming_value - $order_qty );
+					// remove incoming stock for current item if order is complete
+					delete_post_meta( $product_id, $meta_key );
+				} else {
+					// update incoming stock for current item if order is not complete
+					$po_status = get_post_meta( $post_ID, $po_meta_key, true );
+					if ( 'new' === $po_status ) {
+						//increase incoming value
+						update_post_meta( $product_id, 'ca_incoming', $order_qty + $product_incoming_value );
+						update_post_meta( $product_id, $meta_key, $order_qty );
+						update_post_meta( $post_ID, $po_meta_key, 'updated' );
+					} else {
+						$prev_incom_value = get_post_meta( $product_id, $meta_key, true );
+						if ( $prev_incom_value !== $order_qty ) {
+							// order was changed
+							$diff = $prev_incom_value - $order_qty;
+							if($diff !== 0){
+								update_post_meta( $product_id, 'ca_incoming', $product_incoming_value - $diff );
+								update_post_meta( $product_id, $meta_key, $order_qty );
+							}
+
+						}
+					}
+				}
 			};
+		} else {
 
-			$product_id = ( $product->get_type() == 'variation' ) ? $product->get_parent_id() : $product->get_id();
-
-			if ( 'completed' == $atum_order_status ) {
-				// remove incoming stock for current item if order is complete
-				delete_post_meta( $product_id, $meta_key );
-			} else {
-				// update incoming stock for current item if order is not complete
-				$order_qty               = $item->get_quantity();
-				update_post_meta( $product_id, 'ca_incoming', $order_qty);
-				update_post_meta( $product_id, $meta_key, $order_qty );
-			}
-		};
+			update_post_meta( $post_ID, $po_meta_key, 'new' );
+		}
 	}
 
 	public function on_incoming_save( $column, $id, $value ) {
@@ -90,12 +112,12 @@ class Class_Admin {
 			$line_items        = $atum_order->get_items( 'line_item' );
 			if ( 'pending' == $atum_order_status ) {
 				foreach ( $line_items as $item_id => $item ) {
-					$product                 = $item->get_product();
-					$product_id              = ( $product->get_type() == 'variation' ) ? $product->get_parent_id() : $product->get_id();
+					$product                = $item->get_product();
+					$product_id             = ( $product->get_type() == 'variation' ) ? $product->get_parent_id() : $product->get_id();
 					$product_incoming_value = get_post_meta( $product_id, 'ca_incoming', true );
-					$order_qty               = $item->get_quantity();
-					$incoming_value = $product_incoming_value - $order_qty;
-					update_post_meta( $product_id, 'ca_incoming', $incoming_value);
+					$order_qty              = $item->get_quantity();
+					$incoming_value         = $product_incoming_value - $order_qty;
+					update_post_meta( $product_id, 'ca_incoming', $incoming_value );
 				}
 			}
 		}

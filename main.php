@@ -1,12 +1,12 @@
 <?php namespace w8\plugins\w8_atum_purchase_order_incoming_stock;
 
 /**
- * Plugin Name:       WooCommerce and ATUM Plugin
+ * Plugin Name:       ATUM Plugin Incoming Extension
  * Plugin URI:        https://webcodist.com/
  * Description:       Updates product's incoming stock level from a pending ATUM purchase order.
  * Version:           1.0.0
- * Author:            Aleksandr Levashov <webcodist@yandex.com>
- * Author URI:        https://webcodist.com/
+ * Author:            Alina Valovenko
+ * Author URI:        http://valovenko.pro
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain:       w8-atum-purchase-order-incoming-stock
