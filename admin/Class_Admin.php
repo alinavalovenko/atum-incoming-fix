@@ -44,35 +44,41 @@ class Class_Admin {
 				$product_id             = ( $product->get_type() == 'variation' ) ? $product->get_parent_id() : $product->get_id();
 				$product_incoming_value = get_post_meta( $product_id, 'ca_incoming', true );
 				$order_qty              = $item->get_quantity();
-				if ( 'completed' == $atum_order_status || 'received' == $atum_order_status ) {
-					//decrease incoming value
-					update_post_meta( $product_id, 'ca_incoming', $product_incoming_value - $order_qty );
-					// remove incoming stock for current item if order is complete
-					delete_post_meta( $product_id, $meta_key );
-				} else {
-					// update incoming stock for current item if order is not complete
-					$po_status = get_post_meta( $post_ID, $po_meta_key, true );
-					if ( 'new' === $po_status ) {
-						//increase incoming value
-						update_post_meta( $product_id, 'ca_incoming', $order_qty + $product_incoming_value );
-						update_post_meta( $product_id, $meta_key, $order_qty );
-						update_post_meta( $post_ID, $po_meta_key, 'updated' );
-					} else {
-						$prev_incom_value = get_post_meta( $product_id, $meta_key, true );
-						if ( $prev_incom_value !== $order_qty ) {
-							// order was changed
-							$diff = $prev_incom_value - $order_qty;
-							if($diff !== 0){
-								update_post_meta( $product_id, 'ca_incoming', $product_incoming_value - $diff );
-								update_post_meta( $product_id, $meta_key, $order_qty );
+				switch ( $atum_order_status ) {
+					case 'completed':
+						//decrease incoming value
+						update_post_meta( $product_id, 'ca_incoming', $product_incoming_value - $order_qty );
+						// remove incoming stock for current item if order is complete
+						delete_post_meta( $product_id, $meta_key );
+						break;
+					case 'received':
+						//decrease incoming value
+						update_post_meta( $product_id, 'ca_incoming', $product_incoming_value - $order_qty );
+						update_post_meta( $product_id, $po_meta_key, 'received');
+						break;
+					default:
+						// update incoming stock for current item if order is not complete
+						$po_status = get_post_meta( $post_ID, $po_meta_key, true );
+						if ( 'new' === $po_status ) {
+							//increase incoming value
+							update_post_meta( $product_id, 'ca_incoming', $order_qty + $product_incoming_value );
+							update_post_meta( $product_id, $meta_key, $order_qty );
+							update_post_meta( $post_ID, $po_meta_key, 'updated' );
+						} else {
+							$prev_incom_value = get_post_meta( $product_id, $meta_key, true );
+							if ( $prev_incom_value !== $order_qty ) {
+								// order was changed
+								$diff = $prev_incom_value - $order_qty;
+								if ( $diff !== 0 ) {
+									update_post_meta( $product_id, 'ca_incoming', $product_incoming_value - $diff );
+									update_post_meta( $product_id, $meta_key, $order_qty );
+								}
+
 							}
-
 						}
-					}
 				}
-			};
+			}
 		} else {
-
 			update_post_meta( $post_ID, $po_meta_key, 'new' );
 		}
 	}
@@ -106,6 +112,7 @@ class Class_Admin {
 	}
 
 	public function on_purchase_move_to_trash( $post_id ) {
+
 		$atum_order = new \Atum\PurchaseOrders\Models\PurchaseOrder( $post_id );
 		if ( $atum_order ) {
 			$atum_order_status = $atum_order->get_status();
